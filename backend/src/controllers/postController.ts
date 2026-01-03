@@ -4,6 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { badRequest, notFound } from "../utils/errors.js";
 import { Post } from "../models/Post.js";
 import { Community } from "../models/Community.js";
+import { User } from "../models/User.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { Vote } from "../models/Vote.js";
 import { updateUserKarma, updateCommunityReputation, incrementCommunityContentCount } from "../utils/karma.js";

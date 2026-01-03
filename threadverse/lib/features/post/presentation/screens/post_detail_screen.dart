@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:threadverse/core/models/comment_model.dart';
 import 'package:threadverse/core/models/post_model.dart';
+import 'package:threadverse/core/models/user_model.dart';
 import 'package:threadverse/core/repositories/comment_repository.dart';
 import 'package:threadverse/core/repositories/post_repository.dart';
+import 'package:threadverse/core/repositories/auth_repository.dart';
+import 'package:threadverse/core/network/api_client.dart';
 import 'package:threadverse/core/widgets/comment_card.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 
@@ -20,6 +23,7 @@ class PostDetailScreen extends StatefulWidget {
 class _PostDetailScreenState extends State<PostDetailScreen> {
   late TextEditingController _commentController;
   PostModel? _post;
+  UserModel? _me;
   List<CommentModel> _comments = [];
   Map<String, List<CommentModel>> _repliesByParent = {};
   bool _loading = false;
@@ -30,6 +34,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   void initState() {
     super.initState();
     _commentController = TextEditingController();
+    _loadMe();
     _load();
   }
 
@@ -69,14 +74,28 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
+  Future<void> _loadMe() async {
+    try {
+      final user = await AuthRepository(ApiClient.instance.client).me();
+      if (mounted) setState(() => _me = user);
+    } catch (_) {
+      // Best-effort; keep _me null if unauthenticated or failed
+    }
+  }
+
   List<CommentModel> get _rootComments =>
       _comments.where((c) => c.parentCommentId == null).toList();
 
   Widget _buildCommentThread(CommentModel comment, {int depth = 0}) {
     final children = _repliesByParent[comment.id] ?? [];
+    final isOwnComment = _me != null &&
+        ((comment.authorId?.isNotEmpty == true && comment.authorId == _me!.id) ||
+            comment.authorUsername == _me!.username);
 
     return CommentCard(
       username: comment.authorUsername,
+      authorId: comment.authorId,
+      avatarUrl: comment.avatarUrl,
       content: comment.content,
       timestamp: comment.createdAt,
       upvotes: comment.upvotes,
@@ -94,9 +113,11 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         await commentRepository.vote(comment.id, -1);
         _load();
       },
-      onReply: () {
-        _showReplyDialog(comment.id);
-      },
+      onReply: isOwnComment
+          ? null
+          : () {
+              _showReplyDialog(comment.id);
+            },
     );
   }
 

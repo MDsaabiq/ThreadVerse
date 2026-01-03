@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:threadverse/core/models/user_model.dart';
 import 'package:threadverse/core/repositories/user_repository.dart';
+import 'package:threadverse/features/trust/widgets/profile_trust_widget.dart';
 
 /// User preview screen - shows other user's profile with follow button
 class UserPreviewScreen extends StatefulWidget {
@@ -118,6 +119,14 @@ class _UserPreviewScreenState extends State<UserPreviewScreen> {
                 user.displayName,
                 style: theme.textTheme.bodyLarge,
               ),
+            const SizedBox(height: 8),
+
+            // Trust level (compact)
+            ProfileTrustLevelSection(
+              userId: user.id,
+              isCompact: true,
+              showBreakdownButton: false,
+            ),
             const SizedBox(height: 8),
 
             // Bio

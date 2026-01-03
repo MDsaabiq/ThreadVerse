@@ -49,7 +49,7 @@ class CommunityHeader extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      name[0].toUpperCase(),
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,

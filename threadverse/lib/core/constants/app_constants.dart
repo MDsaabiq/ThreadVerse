@@ -9,8 +9,8 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   static const String appTagline = 'Community-Driven Discussions';
 
-  // API Configuration (backend always on localhost:4000 in same container)
-  static const String baseUrl = 'http://localhost:4000/api/v1';
+  // API Configuration - Production: Render, Development: localhost
+  static const String baseUrl = 'https://threadverse.onrender.com/api/v1/';
 
   static const int apiTimeout = 30000; // 30 seconds
 

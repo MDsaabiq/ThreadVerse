@@ -5,6 +5,7 @@ import 'package:threadverse/core/repositories/post_repository.dart';
 import 'package:threadverse/core/repositories/auth_repository.dart';
 import 'package:threadverse/core/network/api_client.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:threadverse/features/trust/widgets/profile_trust_widget.dart';
 
 /// Reusable post card widget for displaying posts
 class PostCard extends StatelessWidget {
@@ -13,6 +14,7 @@ class PostCard extends StatelessWidget {
   final String? content;
   final String? imageUrl;
   final String username;
+  final String? authorId;
   final String communityName;
   final DateTime timestamp;
   final int upvotes;
@@ -33,6 +35,7 @@ class PostCard extends StatelessWidget {
     this.content,
     this.imageUrl,
     required this.username,
+    this.authorId,
     required this.communityName,
     required this.timestamp,
     this.upvotes = 0,
@@ -62,7 +65,10 @@ class PostCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   CircleAvatar(
                     radius: 10,
@@ -78,7 +84,6 @@ class PostCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
                   if (communityName.isNotEmpty)
                     InkWell(
                       onTap: () => context.push('/community/$communityName'),
@@ -98,7 +103,7 @@ class PostCard extends StatelessWidget {
                       ),
                     ),
                   Text(
-                    ' • Posted by ',
+                    '• Posted by',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.textTheme.bodySmall?.color?.withOpacity(0.6),
                     ),
@@ -110,14 +115,14 @@ class PostCard extends StatelessWidget {
                       style: theme.textTheme.bodySmall,
                     ),
                   ),
+                  if (authorId != null && authorId!.isNotEmpty)
+                    MiniTrustIndicator(userId: authorId!),
                   Text(
-                    ' • ${timeago.format(timestamp)}',
+                    '• ${timeago.format(timestamp)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.textTheme.bodySmall?.color?.withOpacity(0.6),
                     ),
                   ),
-                  const Spacer(),
-                  _buildPostMenu(context, theme),
                 ],
               ),
               const SizedBox(height: 12),
@@ -178,273 +183,112 @@ class PostCard extends StatelessWidget {
               const SizedBox(height: 12),
 
               // Actions
-              Row(
-                children: [
-                  // Votes
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        InkWell(
-                          onTap: onUpvote,
-                          child: Icon(
-                            isUpvoted
-                                ? Icons.arrow_upward
-                                : Icons.arrow_upward_outlined,
-                            size: 18,
-                            color: isUpvoted ? Colors.orange : null,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableWidth = constraints.maxWidth;
+
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    alignment: WrapAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: onUpvote,
+                              child: Icon(
+                                isUpvoted
+                                    ? Icons.arrow_upward
+                                    : Icons.arrow_upward_outlined,
+                                size: 18,
+                                color: isUpvoted ? Colors.orange : null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              netVotes.toString(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: isUpvoted
+                                    ? Colors.orange
+                                    : isDownvoted
+                                        ? Colors.blue
+                                        : null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            InkWell(
+                              onTap: onDownvote,
+                              child: Icon(
+                                isDownvoted
+                                    ? Icons.arrow_downward
+                                    : Icons.arrow_downward_outlined,
+                                size: 18,
+                                color: isDownvoted ? Colors.blue : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          // Allow wrap while preventing negative widths
+                          maxWidth: availableWidth,
+                        ),
+                        child: InkWell(
+                          onTap: onComment ?? () => context.push('/post/$postId'),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.comment_outlined, size: 18),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    '$commentCount ${commentCount == 1 ? 'Comment' : 'Comments'}',
+                                    style: theme.textTheme.bodySmall,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          netVotes.toString(),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: isUpvoted
-                                ? Colors.orange
-                                : isDownvoted
-                                ? Colors.blue
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: onDownvote,
-                          child: Icon(
-                            isDownvoted
-                                ? Icons.arrow_downward
-                                : Icons.arrow_downward_outlined,
-                            size: 18,
-                            color: isDownvoted ? Colors.blue : null,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // Comments
-                  InkWell(
-                    onTap: onComment ?? () => context.push('/post/$postId'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
                       ),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.comment_outlined, size: 18),
-                          const SizedBox(width: 6),
-                          Text(
-                            '$commentCount ${commentCount == 1 ? 'Comment' : 'Comments'}',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
 
-                  const Spacer(),
-
-                  // Share button
-                  IconButton(
-                    icon: const Icon(Icons.share_outlined, size: 18),
-                    onPressed: () {},
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
+                      IconButton(
+                        icon: const Icon(Icons.share_outlined, size: 18),
+                        onPressed: () {},
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           ),
         ),
       ),
-
-  Widget _buildPostMenu(BuildContext context, ThemeData theme) {
-    return FutureBuilder(
-      future: _checkIsOwnPost(),
-      builder: (context, snapshot) {
-        final isOwnPost = snapshot.data ?? false;
-        
-        return PopupMenuButton<String>(
-          icon: Icon(Icons.more_horiz, size: 20),
-          onSelected: (value) async {
-            if (value == 'edit') {
-              _showEditDialog(context);
-            } else if (value == 'delete') {
-              _showDeleteConfirmation(context);
-            } else if (value == 'share') {
-              // Handle share
-            }
-          },
-          itemBuilder: (context) => [
-            if (isOwnPost) ...[
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, size: 18),
-                    SizedBox(width: 12),
-                    Text('Edit'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete, size: 18, color: Colors.red),
-                    SizedBox(width: 12),
-                    Text('Delete', style: TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
-            const PopupMenuItem(
-              value: 'share',
-              child: Row(
-                children: [
-                  Icon(Icons.share, size: 18),
-                  SizedBox(width: 12),
-                  Text('Share'),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<bool> _checkIsOwnPost() async {
-    try {
-      final authRepo = AuthRepository(ApiClient.instance.client);
-      final user = await authRepo.me();
-      return user.username == username;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  void _showEditDialog(BuildContext context) {
-    final titleController = TextEditingController(text: title);
-    final bodyController = TextEditingController(text: content ?? '');
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Post'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: bodyController,
-                decoration: const InputDecoration(
-                  labelText: 'Body',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 8,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await postRepository.updatePost(
-                  id: postId,
-                  title: titleController.text.trim(),
-                  body: bodyController.text.trim(),
-                );
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Post updated successfully')),
-                  );
-                  if (onUpdate != null) onUpdate!();
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to update post: $e')),
-                  );
-                }
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Post'),
-        content: const Text('Are you sure you want to delete this post? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              try {
-                await postRepository.deletePost(postId);
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Post deleted successfully')),
-                  );
-                  if (onDelete != null) onDelete!();
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete post: $e')),
-                  );
-                }
-              }
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
     );
   }
 }

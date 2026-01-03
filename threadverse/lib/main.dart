@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:threadverse/core/constants/app_constants.dart';
 import 'package:threadverse/core/network/api_client.dart';
 import 'package:threadverse/core/theme/app_theme.dart';
+import 'package:threadverse/core/theme/theme_controller.dart';
 import 'package:threadverse/routing/app_router.dart';
 
 Future<void> main() async {
@@ -17,8 +18,7 @@ class ThreadVerseApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // TODO: Watch theme provider when implemented
-    // final themeMode = ref.watch(themeProvider);
+    final themeState = ref.watch(themeControllerProvider);
 
     return MaterialApp.router(
       title: AppConstants.appName,
@@ -26,8 +26,9 @@ class ThreadVerseApp extends ConsumerWidget {
 
       // Theming
       theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system, // TODO: Make this dynamic
+      darkTheme:
+          themeState.useAmoled ? AppTheme.amoledTheme : AppTheme.darkTheme,
+      themeMode: themeState.themeMode,
       // Routing
       routerConfig: AppRouter.router,
     );

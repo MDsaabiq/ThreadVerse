@@ -12,6 +12,7 @@ const userSchema = new Schema(
       post: { type: Number, default: 0 },
       comment: { type: Number, default: 0 },
     },
+    trustLevel: { type: Types.ObjectId, ref: "TrustLevel" },
     followersCount: { type: Number, default: 0 },
     followingCount: { type: Number, default: 0 },
     roles: [{ type: String }],

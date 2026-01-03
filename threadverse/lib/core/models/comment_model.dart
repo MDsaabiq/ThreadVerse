@@ -3,6 +3,8 @@ class CommentModel {
   final String postId;
   final String? parentCommentId;
   final String authorUsername;
+  final String? authorId;
+  final String? avatarUrl;
   final String content;
   final int depth;
   final int voteScore;
@@ -15,6 +17,8 @@ class CommentModel {
     required this.postId,
     required this.parentCommentId,
     required this.authorUsername,
+    this.authorId,
+    this.avatarUrl,
     required this.content,
     required this.depth,
     required this.voteScore,
@@ -32,6 +36,10 @@ class CommentModel {
       authorUsername: author != null
           ? (author['username'] ?? '')
           : (json['authorUsername'] ?? ''),
+      authorId: author != null
+          ? (author['_id']?.toString() ?? author['id']?.toString())
+          : json['authorId']?.toString(),
+      avatarUrl: author != null ? author['avatarUrl'] as String? : null,
       content: json['content'] ?? '',
       depth: (json['depth'] ?? 0) as int,
       voteScore: (json['voteScore'] ?? 0) as int,

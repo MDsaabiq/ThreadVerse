@@ -165,7 +165,9 @@ class _CommunitiesListScreenState extends State<CommunitiesListScreen> {
                                     : null,
                                 child: (community.iconUrl == null || community.iconUrl!.isEmpty)
                                     ? Text(
-                                        community.name[0].toUpperCase(),
+                                    community.name.isNotEmpty
+                                      ? community.name[0].toUpperCase()
+                                      : '?',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: theme.colorScheme.onPrimaryContainer,

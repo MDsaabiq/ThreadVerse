@@ -14,7 +14,7 @@ class AuthRepository {
     required String password,
   }) async {
     final resp = await _client.post(
-      '/auth/signup',
+      'auth/signup',
       data: {'username': username, 'email': email, 'password': password},
     );
     final user = UserModel.fromJson(resp.data['user']);
@@ -28,7 +28,7 @@ class AuthRepository {
     required String password,
   }) async {
     final resp = await _client.post(
-      '/auth/login',
+      'auth/login',
       data: {'usernameOrEmail': usernameOrEmail, 'password': password},
     );
     final user = UserModel.fromJson(resp.data['user']);
@@ -38,7 +38,7 @@ class AuthRepository {
   }
 
   Future<UserModel> me() async {
-    final resp = await _client.get('/auth/me');
+    final resp = await _client.get('auth/me');
     return UserModel.fromJson(resp.data['user']);
   }
 

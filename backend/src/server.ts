@@ -17,11 +17,26 @@ const app = express();
 app.enable("trust proxy");
 
 const corsOptions: cors.CorsOptions = {
-  origin: (_origin, callback) => {
-    // Allow all origins (frontends may be served via forwarded HTTPS hosts)
-    callback(null, true);
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:8080',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
+      'http://127.0.0.1:8080',
+    ];
+    
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400,
 };
 
 app.use(helmet());

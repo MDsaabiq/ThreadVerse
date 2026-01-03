@@ -14,6 +14,9 @@ import 'package:threadverse/features/community/presentation/screens/join_request
 import 'package:threadverse/features/profile/presentation/screens/profile_screen.dart';
 import 'package:threadverse/features/profile/presentation/screens/user_preview_screen.dart';
 import 'package:threadverse/features/settings/presentation/screens/settings_screen.dart';
+import 'package:threadverse/features/settings/presentation/screens/analytics_dashboard_screen.dart';
+import 'package:threadverse/features/trust/pages/trust_leaderboard_page.dart';
+import 'package:threadverse/features/trust/pages/trust_level_breakdown_page.dart';
 
 /// App routing configuration using GoRouter
 /// Handles navigation, deep linking, and route guards
@@ -142,12 +145,39 @@ class AppRouter {
         },
       ),
 
+      // Trust Routes
+      GoRoute(
+        path: '/trust/leaderboard',
+        name: 'trust-leaderboard',
+        pageBuilder: (context, state) =>
+            MaterialPage(key: state.pageKey, child: const TrustLeaderboardPage()),
+      ),
+      GoRoute(
+        path: '/trust/:userId/breakdown',
+        name: 'trust-breakdown',
+        pageBuilder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          return MaterialPage(
+            key: state.pageKey,
+            child: TrustLevelBreakdownPage(userId: userId),
+          );
+        },
+      ),
+
       // Settings Routes
       GoRoute(
         path: AppConstants.routeSettings,
         name: 'settings',
         pageBuilder: (context, state) =>
             MaterialPage(key: state.pageKey, child: const SettingsScreen()),
+      ),
+
+      // Analytics Routes
+      GoRoute(
+        path: '/analytics/dashboard',
+        name: 'analytics-dashboard',
+        pageBuilder: (context, state) =>
+            MaterialPage(key: state.pageKey, child: const AnalyticsDashboardScreen()),
       ),
     ],
 

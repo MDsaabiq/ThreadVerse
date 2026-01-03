@@ -2,6 +2,7 @@ class PostModel {
   final String id;
   final String communityName;
   final String authorUsername;
+  final String? authorId;
   final String type;
   final String title;
   final String? body;
@@ -20,6 +21,7 @@ class PostModel {
     required this.id,
     required this.communityName,
     required this.authorUsername,
+    this.authorId,
     required this.type,
     required this.title,
     required this.body,
@@ -46,6 +48,9 @@ class PostModel {
       authorUsername: author != null
           ? (author['username'] ?? '')
           : (json['authorUsername'] ?? ''),
+      authorId: author != null
+          ? (author['_id']?.toString() ?? author['id']?.toString())
+          : json['authorId']?.toString(),
       type: json['type'] ?? 'text',
       title: json['title'] ?? '',
       body: json['body'],

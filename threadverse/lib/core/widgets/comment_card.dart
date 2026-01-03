@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:threadverse/features/trust/widgets/profile_trust_widget.dart';
+import 'package:threadverse/core/network/api_client.dart';
+import 'package:threadverse/core/repositories/user_repository.dart';
 
 /// Reusable comment card widget for displaying comments
 class CommentCard extends StatelessWidget {
   final String username;
+  final String? authorId;
   final String? avatarUrl;
   final String content;
   final String? imageUrl;
@@ -23,6 +27,7 @@ class CommentCard extends StatelessWidget {
   const CommentCard({
     super.key,
     required this.username,
+    this.authorId,
     this.avatarUrl,
     required this.content,
     this.imageUrl,
@@ -43,7 +48,6 @@ class CommentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final netVotes = upvotes - downvotes;
-    final initial = username.isNotEmpty ? username[0].toUpperCase() : '?';
 
     return Container(
       margin: EdgeInsets.only(left: depth * 16.0, bottom: 8.0),
@@ -67,25 +71,11 @@ class CommentCard extends StatelessWidget {
               // Header
               Row(
                 children: [
-                  GestureDetector(
+                  CommentAvatar(
+                    username: username,
+                    authorId: authorId,
+                    avatarUrl: avatarUrl,
                     onTap: () => context.push('/user-preview/$username'),
-                    child: CircleAvatar(
-                      radius: 12,
-                      backgroundColor: theme.primaryColor,
-                      backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
-                          ? NetworkImage(avatarUrl!)
-                          : null,
-                      child: (avatarUrl == null || avatarUrl!.isEmpty)
-                          ? Text(
-                              username.isNotEmpty ? username[0].toUpperCase() : '?',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          : null,
-                    ),
                   ),
                   const SizedBox(width: 8),
                   GestureDetector(
@@ -98,6 +88,10 @@ class CommentCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (authorId != null && authorId!.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    MiniTrustIndicator(userId: authorId!),
+                  ],
                   const SizedBox(width: 8),
                   Text(
                     '• ${timeago.format(timestamp)}',
@@ -209,6 +203,102 @@ class CommentCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class CommentAvatar extends StatefulWidget {
+  final String username;
+  final String? authorId;
+  final String? avatarUrl;
+  final VoidCallback? onTap;
+
+  const CommentAvatar({
+    super.key,
+    required this.username,
+    this.authorId,
+    this.avatarUrl,
+    this.onTap,
+  });
+
+  @override
+  State<CommentAvatar> createState() => _CommentAvatarState();
+}
+
+class _CommentAvatarState extends State<CommentAvatar> {
+  static final Map<String, String?> _cache = {};
+  String? _resolvedUrl;
+  bool _fetching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolvedUrl = widget.avatarUrl;
+    _maybeFetch();
+  }
+
+  @override
+  void didUpdateWidget(covariant CommentAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.authorId != widget.authorId || oldWidget.avatarUrl != widget.avatarUrl) {
+      _resolvedUrl = widget.avatarUrl;
+      _maybeFetch();
+    }
+  }
+
+  void _maybeFetch() {
+    if ((_resolvedUrl != null && _resolvedUrl!.isNotEmpty)) return;
+    final cacheKey = widget.authorId ?? widget.username;
+    final cached = _cache[cacheKey];
+    if (cached != null) {
+      setState(() => _resolvedUrl = cached);
+      return;
+    }
+    _fetchAvatar(cacheKey);
+  }
+
+  Future<void> _fetchAvatar(String cacheKey) async {
+    if (_fetching) return;
+    _fetching = true;
+    try {
+      final repo = UserRepository(ApiClient.instance.client);
+      final user = await repo.getUser(widget.username);
+      final url = user.avatarUrl;
+      _cache[cacheKey] = url;
+      if (mounted) {
+        setState(() => _resolvedUrl = url);
+      }
+    } catch (_) {
+      // Fail silently; keep fallback initial
+    } finally {
+      _fetching = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final initial = widget.username.isNotEmpty ? widget.username[0].toUpperCase() : '?';
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: CircleAvatar(
+        radius: 12,
+        backgroundColor: theme.primaryColor,
+        backgroundImage: _resolvedUrl != null && _resolvedUrl!.isNotEmpty
+            ? NetworkImage(_resolvedUrl!)
+            : null,
+        child: (_resolvedUrl == null || _resolvedUrl!.isEmpty)
+            ? Text(
+                initial,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+            : null,
       ),
     );
   }

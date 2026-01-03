@@ -3,17 +3,20 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:threadverse/core/constants/app_constants.dart';
 import 'package:threadverse/core/models/community_model.dart';
+import 'package:threadverse/core/models/draft_model.dart';
 import 'package:threadverse/core/repositories/community_repository.dart';
 import 'package:threadverse/core/repositories/post_repository.dart';
 import 'package:threadverse/core/repositories/upload_repository.dart';
+import 'dart:async';
 import 'package:threadverse/core/widgets/image_picker_widget.dart';
 import 'package:threadverse/core/utils/error_handler.dart';
 
 /// Create post screen with detailed options and validation
 class CreatePostScreen extends StatefulWidget {
   final String? communityId;
+  final String? draftId;
 
-  const CreatePostScreen({super.key, this.communityId});
+  const CreatePostScreen({super.key, this.communityId, this.draftId});
 
   @override
   State<CreatePostScreen> createState() => _CreatePostScreenState();
@@ -33,6 +36,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   bool _loadingCommunities = true;
   String? _uploadedImageUrl;
   bool _uploadingImage = false;
+  
+  // Draft-related fields
+  Timer? _autoSaveTimer;
+  String? _currentDraftId;
+  DateTime? _lastSaved;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -42,6 +51,128 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     _linkController = TextEditingController();
     _pollOptionControllers = [TextEditingController(), TextEditingController()];
     _loadCommunities();
+    _loadDraft();
+    
+    // Setup auto-save listeners
+    _titleController.addListener(_scheduleAutoSave);
+    _contentController.addListener(_scheduleAutoSave);
+    _linkController.addListener(_scheduleAutoSave);
+  }
+
+  Future<void> _loadDraft() async {
+    if (widget.draftId != null && widget.draftId != 'new') {
+      try {
+        final draft = await draftRepository.getDraft(widget.draftId!);
+        setState(() {
+          _currentDraftId = draft.id;
+          _titleController.text = draft.title ?? '';
+          _contentController.text = draft.body ?? '';
+          _linkController.text = draft.linkUrl ?? '';
+          _postType = draft.postType ?? 'text';
+          _selectedCommunity = draft.communityName;
+          _tags.addAll(draft.tags ?? []);
+          _isSpoiler = draft.isSpoiler ?? false;
+          _isOc = draft.isOc ?? false;
+          _uploadedImageUrl = draft.imageUrl;
+          
+          if (draft.pollOptions != null && draft.pollOptions!.isNotEmpty) {
+            _pollOptionControllers = draft.pollOptions!
+                .map((opt) => TextEditingController(text: opt))
+                .toList();
+          }
+          
+          _lastSaved = draft.lastSavedAt;
+        });
+      } catch (e) {
+        if (mounted) {
+          ErrorHandler.handleError(context, e);
+        }
+      }
+    }
+  }
+
+  void _scheduleAutoSave() {
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(const Duration(seconds: 3), _autoSaveDraft);
+  }
+
+  Future<void> _autoSaveDraft() async {
+    if (_isSaving) return;
+    
+    // Only save if there's content
+    if (_titleController.text.trim().isEmpty && 
+        _contentController.text.trim().isEmpty &&
+        _linkController.text.trim().isEmpty) {
+      return;
+    }
+    
+    setState(() => _isSaving = true);
+    
+    try {
+      final draft = await draftRepository.saveDraftPost(
+        id: _currentDraftId ?? 'new',
+        communityId: _selectedCommunity,
+        postType: _postType,
+        title: _titleController.text.trim(),
+        body: _contentController.text.trim(),
+        linkUrl: _linkController.text.trim(),
+        imageUrl: _uploadedImageUrl,
+        tags: _tags,
+        isSpoiler: _isSpoiler,
+        isOc: _isOc,
+        pollOptions: _postType == 'poll'
+            ? _pollOptionControllers.map((c) => c.text.trim()).toList()
+            : null,
+      );
+      
+      setState(() {
+        _currentDraftId = draft.id;
+        _lastSaved = draft.lastSavedAt;
+      });
+    } catch (e) {
+      // Silent fail for auto-save
+      debugPrint('Auto-save failed: $e');
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _manualSaveDraft() async {
+    setState(() => _isSaving = true);
+    
+    try {
+      final draft = await draftRepository.saveDraftPost(
+        id: _currentDraftId ?? 'new',
+        communityId: _selectedCommunity,
+        postType: _postType,
+        title: _titleController.text.trim(),
+        body: _contentController.text.trim(),
+        linkUrl: _linkController.text.trim(),
+        imageUrl: _uploadedImageUrl,
+        tags: _tags,
+        isSpoiler: _isSpoiler,
+        isOc: _isOc,
+        pollOptions: _postType == 'poll'
+            ? _pollOptionControllers.map((c) => c.text.trim()).toList()
+            : null,
+      );
+      
+      setState(() {
+        _currentDraftId = draft.id;
+        _lastSaved = draft.lastSavedAt;
+      });
+      
+      if (mounted) {
+        ErrorHandler.showSuccess(context, 'Draft saved');
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.handleError(context, e);
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
   }
 
   Future<void> _loadCommunities() async {
@@ -64,6 +195,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   @override
   void dispose() {
+    _autoSaveTimer?.cancel();
     _titleController.dispose();
     _contentController.dispose();
     _linkController.dispose();
@@ -436,27 +568,72 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             ),
 
             const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Save Draft'),
+            if (_lastSaved != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  _isSaving 
+                      ? 'Saving draft...' 
+                      : 'Last saved: ${_formatSaveTime(_lastSaved!)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: _isSaving ? Colors.orange : Colors.green,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _handleSubmit,
-                    icon: const Icon(Icons.send),
-                    label: const Text('Post'),
-                  ),
-                ),
-              ],
+              ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 360;
+
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OutlinedButton(
+                        onPressed: _isSaving ? null : _manualSaveDraft,
+                        child: const Text('Save Draft'),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: _handleSubmit,
+                        icon: const Icon(Icons.send),
+                        label: const Text('Post'),
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isSaving ? null : _manualSaveDraft,
+                        child: const Text('Save Draft'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _handleSubmit,
+                        icon: const Icon(Icons.send),
+                        label: const Text('Post'),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatSaveTime(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
   }
 }

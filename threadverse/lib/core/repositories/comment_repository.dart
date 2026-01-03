@@ -7,7 +7,7 @@ class CommentRepository {
   final Dio _client;
 
   Future<List<CommentModel>> listForPost(String postId) async {
-    final resp = await _client.get('/comments/posts/$postId');
+    final resp = await _client.get('comments/posts/$postId');
     final list = resp.data['comments'] as List<dynamic>? ?? [];
     return list
         .map((e) => CommentModel.fromJson(e as Map<String, dynamic>))
@@ -20,7 +20,7 @@ class CommentRepository {
     required String content,
   }) async {
     final resp = await _client.post(
-      '/comments/posts/$postId',
+      'comments/posts/$postId',
       data: {'parentCommentId': parentId, 'content': content},
     );
     return CommentModel.fromJson(resp.data['comment']);
@@ -28,7 +28,7 @@ class CommentRepository {
 
   Future<Map<String, int>> vote(String commentId, int value) async {
     final resp = await _client.post(
-      '/comments/$commentId/vote',
+      'comments/$commentId/vote',
       data: {'value': value},
     );
     return {

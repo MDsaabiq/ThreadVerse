@@ -7,7 +7,7 @@ class NotificationRepository {
   final Dio _client;
 
   Future<List<NotificationModel>> listNotifications() async {
-    final resp = await _client.get('/notifications');
+    final resp = await _client.get('notifications');
     final list = resp.data['notifications'] as List<dynamic>? ?? [];
     return list
         .map((e) => NotificationModel.fromJson(e as Map<String, dynamic>))
@@ -15,16 +15,16 @@ class NotificationRepository {
   }
 
   Future<int> getUnreadCount() async {
-    final resp = await _client.get('/notifications/unread-count');
+    final resp = await _client.get('notifications/unread-count');
     return resp.data['count'] as int? ?? 0;
   }
 
   Future<void> markAsRead(String id) async {
-    await _client.post('/notifications/$id/read');
+    await _client.post('notifications/$id/read');
   }
 
   Future<void> markAllAsRead() async {
-    await _client.post('/notifications/mark-all-read');
+    await _client.post('notifications/mark-all-read');
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:threadverse/core/models/post_model.dart';
 import 'package:threadverse/core/repositories/post_repository.dart';
 import 'package:threadverse/core/widgets/post_card.dart';
 import 'package:threadverse/core/widgets/notification_bell.dart';
+import 'package:threadverse/core/widgets/post_card_skeleton.dart';
 
 /// Home screen showing main feed
 class HomeScreen extends StatefulWidget {
@@ -72,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.sort),
             onSelected: (value) {
               setState(() => _sortBy = value);
+              _loadPosts();
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'hot', child: Text('🔥 Hot')),
@@ -98,85 +100,15 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: _loadPosts,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: 6,
+                itemBuilder: (_, __) => const PostCardSkeleton(),
+              )
             : _errorMessage != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Oops! Something went wrong',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Text(
-                            'Failed to load posts. Please check your connection.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: _loadPosts,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Try Again'),
-                        ),
-                      ],
-                    ),
-                  )
+                ? _ErrorState(onRetry: _loadPosts)
                 : _posts.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: 64,
-                              color: Theme.of(context).disabledColor,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No posts yet',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context).disabledColor,
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Be the first to share something in your communities!',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color: Theme.of(context).disabledColor,
-                                  ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              onPressed: () => context.push('/create-post'),
-                              icon: const Icon(Icons.edit),
-                              label: const Text('Create Post'),
-                            ),
-                          ],
-                        ),
-                      )
+                    ? _EmptyState(onCreatePost: () => context.push('/create-post'))
                     : ListView.builder(
                         itemCount: _posts.length + 1,
                         itemBuilder: (context, index) {
@@ -206,6 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             content: post.body,
                             imageUrl: post.imageUrl,
                             username: post.authorUsername,
+                            authorId: post.authorId,
                             communityName: post.communityName ?? 'Public',
                             timestamp: post.createdAt,
                             upvotes: post.upvotes,
@@ -268,6 +201,102 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Settings',
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.wifi_tethering_off,
+              size: 64,
+              color: theme.colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Can\'t load the feed',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Check your connection and try again. We\'re holding your place.',
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.onCreatePost});
+
+  final VoidCallback onCreatePost;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 64,
+              color: theme.disabledColor,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No posts yet',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.disabledColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Kick off the conversation with your first post.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.disabledColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onCreatePost,
+              icon: const Icon(Icons.edit),
+              label: const Text('Create Post'),
+            ),
+          ],
+        ),
       ),
     );
   }

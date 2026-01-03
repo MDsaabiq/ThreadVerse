@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:threadverse/core/models/notification_model.dart';
 import 'package:threadverse/core/repositories/notification_repository.dart';
 
+import 'dart:async';
+
 /// Modern notification bell widget with dropdown
 class NotificationBell extends StatefulWidget {
   const NotificationBell({super.key});
@@ -17,6 +19,7 @@ class _NotificationBellState extends State<NotificationBell>
   int _unreadCount = 0;
   bool _loading = false;
   bool _isOpen = false;
+  bool _hasError = false;
   late OverlayEntry _overlayEntry;
 
   @override
@@ -42,19 +45,35 @@ class _NotificationBellState extends State<NotificationBell>
     setState(() => _loading = true);
     
     try {
-      final notifications = await notificationRepository.listNotifications();
-      final unreadCount = await notificationRepository.getUnreadCount();
+      final notifications = await notificationRepository
+          .listNotifications()
+          .timeout(const Duration(seconds: 5));
+      final unreadCount =
+          await notificationRepository.getUnreadCount().timeout(
+                const Duration(seconds: 5),
+              );
       
       if (!mounted) return;
       setState(() {
         _notifications = notifications;
         _unreadCount = unreadCount;
         _loading = false;
+        _hasError = false;
+      });
+    } on TimeoutException {
+      if (!mounted) return;
+      setState(() {
+        _notifications = [];
+        _loading = false;
+        _hasError = true;
       });
     } catch (e) {
-      // Handle error silently
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _notifications = [];
+        _loading = false;
+        _hasError = true;
+      });
     }
   }
 
@@ -76,10 +95,15 @@ class _NotificationBellState extends State<NotificationBell>
     return OverlayEntry(
       builder: (context) {
         final theme = Theme.of(context);
+        final screenWidth = MediaQuery.of(context).size.width;
+        // Keep panel within viewport on narrow screens to avoid overflow
+        final panelWidth = screenWidth - 16 <= 360
+            ? (screenWidth - 16).clamp(240.0, 360.0)
+            : 360.0;
         return Positioned(
           top: 60,
           right: 8,
-          width: 360,
+          width: panelWidth,
           child: ScaleTransition(
             scale: _animationController,
             alignment: Alignment.topRight,
@@ -132,7 +156,6 @@ class _NotificationBellState extends State<NotificationBell>
                         ],
                       ),
                     ),
-                    // Notifications List
                     _loading
                         ? Padding(
                             padding: const EdgeInsets.all(24),
@@ -146,48 +169,75 @@ class _NotificationBellState extends State<NotificationBell>
                               ),
                             ),
                           )
-                        : _notifications.isEmpty
+                        : _hasError
                             ? Padding(
                                 padding: const EdgeInsets.all(32),
                                 child: Column(
                                   children: [
                                     Icon(
-                                      Icons.notifications_none,
+                                      Icons.error_outline,
                                       size: 48,
-                                      color: theme.disabledColor,
+                                      color: theme.colorScheme.error,
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
-                                      'No notifications yet',
+                                      'Failed to load notifications',
                                       style: theme.textTheme.bodyMedium
                                           ?.copyWith(
-                                        color: theme.disabledColor,
+                                        color: theme.colorScheme.error,
                                       ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: _loadNotifications,
+                                      child: const Text('Retry'),
                                     ),
                                   ],
                                 ),
                               )
-                            : ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxHeight: 400,
-                                ),
-                                child: ListView.separated(
-                                  shrinkWrap: true,
-                                  itemCount: _notifications.length,
-                                  separatorBuilder: (_, __) => Divider(
-                                    height: 1,
-                                    color: theme.dividerColor,
+                            : _notifications.isEmpty
+                                ? Padding(
+                                    padding: const EdgeInsets.all(32),
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.notifications_none,
+                                          size: 48,
+                                          color: theme.disabledColor,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          'No notifications yet',
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                            color: theme.disabledColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxHeight: 400,
+                                    ),
+                                    child: ListView.separated(
+                                      shrinkWrap: true,
+                                      itemCount: _notifications.length,
+                                      separatorBuilder: (_, __) => Divider(
+                                        height: 1,
+                                        color: theme.dividerColor,
+                                      ),
+                                      itemBuilder: (context, index) {
+                                        final notification =
+                                            _notifications[index];
+                                        return _buildNotificationItem(
+                                          context,
+                                          theme,
+                                          notification,
+                                        );
+                                      },
+                                    ),
                                   ),
-                                  itemBuilder: (context, index) {
-                                    final notification = _notifications[index];
-                                    return _buildNotificationItem(
-                                      context,
-                                      theme,
-                                      notification,
-                                    );
-                                  },
-                                ),
-                              ),
                   ],
                 ),
               ),
@@ -221,7 +271,6 @@ class _NotificationBellState extends State<NotificationBell>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar/Icon
                 Container(
                   width: 40,
                   height: 40,
@@ -237,16 +286,18 @@ class _NotificationBellState extends State<NotificationBell>
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
                             child: Text(
                               notification.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: notification.isRead
@@ -255,14 +306,16 @@ class _NotificationBellState extends State<NotificationBell>
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
                           if (!notification.isRead)
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: theme.primaryColor,
-                                shape: BoxShape.circle,
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: theme.primaryColor,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
                             ),
                         ],

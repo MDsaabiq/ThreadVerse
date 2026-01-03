@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:threadverse/core/theme/theme_controller.dart';
 
 /// Settings screen with key preferences and account actions (mock)
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool _darkMode = false;
-  bool _amoled = false;
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _pushMentions = true;
   bool _pushReplies = true;
   bool _emailDigests = false;
@@ -18,6 +19,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final themeState = ref.watch(themeControllerProvider);
+    final themeController = ref.read(themeControllerProvider.notifier);
+    final isDark = themeState.themeMode == ThemeMode.dark;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -29,15 +33,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               SwitchListTile(
                 title: const Text('Dark mode'),
-                subtitle: const Text('Match system or toggle manually'),
-                value: _darkMode,
-                onChanged: (v) => setState(() => _darkMode = v),
+                subtitle: const Text('Overrides system preference'),
+                value: isDark,
+                onChanged: (v) async {
+                  await themeController.setThemeMode(
+                    v ? ThemeMode.dark : ThemeMode.light,
+                  );
+                },
               ),
               SwitchListTile(
                 title: const Text('AMOLED mode'),
                 subtitle: const Text('Pure black backgrounds'),
-                value: _amoled,
-                onChanged: (v) => setState(() => _amoled = v),
+                value: themeState.useAmoled,
+                onChanged: isDark
+                    ? (v) async => themeController.setAmoled(v)
+                    : null,
               ),
             ],
           ),
@@ -77,6 +87,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () {
                   // TODO: navigate to profile edit
                 },
+              ),
+              ListTile(
+                leading: const Icon(Icons.leaderboard_outlined),
+                title: const Text('Trust Leaderboard'),
+                subtitle: const Text('View top trusted users'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/trust/leaderboard'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.analytics_outlined),
+                title: const Text('Analytics Dashboard'),
+                subtitle: const Text('View community metrics'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/analytics/dashboard'),
               ),
               ListTile(
                 leading: const Icon(Icons.privacy_tip_outlined),

@@ -8,6 +8,7 @@ class CommunityModel {
   final int memberCount;
   final String? iconUrl;
   final String? bannerUrl;
+  final String? createdBy;
 
   CommunityModel({
     required this.id,
@@ -19,6 +20,7 @@ class CommunityModel {
     required this.memberCount,
     this.iconUrl,
     this.bannerUrl,
+    this.createdBy,
   });
 
   factory CommunityModel.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,7 @@ class CommunityModel {
       memberCount: (json['memberCount'] ?? 0) as int,
       iconUrl: json['iconUrl'] as String?,
       bannerUrl: json['bannerUrl'] as String?,
+      createdBy: json['createdBy']?.toString(),
     );
   }
 }

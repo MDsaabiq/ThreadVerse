@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:threadverse/core/models/post_model.dart';
 import 'package:threadverse/core/network/api_client.dart';
+import 'package:threadverse/core/repositories/draft_repository.dart';
+import 'package:threadverse/core/repositories/analytics_repository.dart';
 
 class PostRepository {
   PostRepository(this._client);
@@ -11,7 +13,7 @@ class PostRepository {
     String sort = 'hot',
   }) async {
     final resp = await _client.get(
-      '/posts',
+      'posts',
       queryParameters: {
         if (community != null) 'community': community,
         'sort': sort,
@@ -24,7 +26,7 @@ class PostRepository {
   }
 
   Future<PostModel> getPost(String id) async {
-    final resp = await _client.get('/posts/$id');
+    final resp = await _client.get('posts/$id');
     return PostModel.fromJson(resp.data['post']);
   }
 
@@ -41,7 +43,7 @@ class PostRepository {
     List<String>? pollOptions,
   }) async {
     final resp = await _client.post(
-      '/posts',
+      'posts',
       data: {
         if (community != null && community.isNotEmpty) 'community': community,
         'title': title,
@@ -59,7 +61,7 @@ class PostRepository {
   }
 
   Future<Map<String, int>> votePost(String id, int value) async {
-    final resp = await _client.post('/posts/$id/vote', data: {'value': value});
+    final resp = await _client.post('posts/$id/vote', data: {'value': value});
     return {
       'voteScore': resp.data['voteScore'] as int,
       'upvotes': resp.data['upvotes'] as int,
@@ -76,7 +78,7 @@ class PostRepository {
     bool? isOc,
   }) async {
     final resp = await _client.put(
-      '/posts/$id',
+      'posts/$id',
       data: {
         if (title != null) 'title': title,
         if (body != null) 'body': body,
@@ -89,7 +91,7 @@ class PostRepository {
   }
 
   Future<void> deletePost(String id) async {
-    await _client.delete('/posts/$id');
+    await _client.delete('posts/$id');
   }
 
   Future<List<PostModel>> listUserPosts({
@@ -97,7 +99,7 @@ class PostRepository {
     String sort = 'hot',
   }) async {
     final resp = await _client.get(
-      '/posts/user/$username',
+      'posts/user/$username',
       queryParameters: {
         'sort': sort,
       },
@@ -110,3 +112,5 @@ class PostRepository {
 }
 
 final postRepository = PostRepository(ApiClient.instance.client);
+final draftRepository = DraftRepository(ApiClient.instance.client);
+final analyticsRepository = AnalyticsRepository(ApiClient.instance.client);

@@ -7,6 +7,9 @@ import commentsRouter from "./comments.js";
 import usersRouter from "./users.js";
 import notificationsRouter from "./notifications.js";
 import uploadRouter from "./upload.js";
+import draftsRouter from "./drafts.js";
+import analyticsRouter from "./analytics.js";
+import trustRouter from "./trust.js";
 
 const router = Router();
 
@@ -18,5 +21,8 @@ router.use("/comments", commentsRouter);
 router.use("/users", usersRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/upload", uploadRouter);
+router.use("/drafts", draftsRouter);
+router.use("/analytics", analyticsRouter);
+router.use("/trust", trustRouter);
 
 export default router;

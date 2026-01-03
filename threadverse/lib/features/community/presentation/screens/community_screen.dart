@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:threadverse/core/models/community_model.dart';
 import 'package:threadverse/core/models/post_model.dart';
+import 'package:threadverse/core/models/user_model.dart';
+import 'package:threadverse/core/network/api_client.dart';
+import 'package:threadverse/core/repositories/auth_repository.dart';
 import 'package:threadverse/core/repositories/community_repository.dart';
 import 'package:threadverse/core/repositories/post_repository.dart';
 import 'package:threadverse/core/widgets/post_card.dart';
@@ -25,6 +28,8 @@ class _CommunityScreenState extends State<CommunityScreen>
   List<PostModel> _posts = const [];
   bool _loading = true;
   String? _errorMessage;
+  UserModel? _me;
+  String? _membershipRole;
 
   @override
   void initState() {
@@ -39,12 +44,34 @@ class _CommunityScreenState extends State<CommunityScreen>
     super.dispose();
   }
 
+  String _initial(String value) =>
+      value.isNotEmpty ? value[0].toUpperCase() : '?';
+
+  bool get _isCreator {
+    final createdBy = _community?.createdBy;
+    final meId = _me?.id;
+    return (createdBy != null && meId != null && createdBy == meId) ||
+        (_membershipRole == 'owner');
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _errorMessage = null;
     });
     try {
+      UserModel? me;
+      Map<String, dynamic>? membership;
+
+      try {
+        final authRepo = AuthRepository(ApiClient.instance.client);
+        me = await authRepo.me();
+        membership =
+            await communityRepository.checkMembership(widget.communityName);
+      } catch (_) {
+        // User might be signed out; membership is optional for viewing.
+      }
+
       final community = await communityRepository.getCommunity(
         widget.communityName,
       );
@@ -56,7 +83,9 @@ class _CommunityScreenState extends State<CommunityScreen>
       setState(() {
         _community = community;
         _posts = posts;
-        _isJoined = false; // Start as false, user joins explicitly
+        _isJoined = membership?['isMember'] == true;
+        _membershipRole = membership?['role'] as String?;
+        _me = me;
         _errorMessage = null;
       });
     } catch (e) {
@@ -118,7 +147,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                     ),
                   ),
                 ),
-              if (_community != null)
+              if (_community != null && !_isCreator)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: Center(
@@ -399,6 +428,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                                         content: post.body,
                                         imageUrl: post.imageUrl,
                                         username: post.authorUsername,
+                                        authorId: post.authorId,
                                         communityName: _community?.name ?? 'Public',
                                         timestamp: post.createdAt,
                                         upvotes: post.upvotes,
@@ -481,9 +511,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                                                 )
                                               : Center(
                                                   child: Text(
-                                                    (_community?.name ?? '')
-                                                        [0]
-                                                        .toUpperCase(),
+                                                    _initial(_community?.name ?? ''),
                                                     style: TextStyle(
                                                       fontSize: 24,
                                                       fontWeight:
@@ -813,8 +841,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                               errorBuilder: (context, error, stackTrace) =>
                                   Center(
                                 child: Text(
-                                  (_community?.name ?? '')[0]
-                                      .toUpperCase(),
+                                  _initial(_community?.name ?? ''),
                                   style: TextStyle(
                                     fontSize: 36,
                                     fontWeight: FontWeight.bold,
@@ -826,7 +853,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                           )
                         : Center(
                             child: Text(
-                              (_community?.name ?? '')[0].toUpperCase(),
+                              _initial(_community?.name ?? ''),
                               style: TextStyle(
                                 fontSize: 36,
                                 fontWeight: FontWeight.bold,
