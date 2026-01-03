@@ -47,6 +47,9 @@ dependencies:
   # Local Storage
   shared_preferences: ^2.3.4
   
+  # Image Picker
+  image_picker: ^1.0.5
+  
   # UI Components
   flutter_svg: ^2.0.16
   cached_network_image: ^3.4.1

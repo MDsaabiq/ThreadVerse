@@ -29,7 +29,7 @@ class PostRepository {
   }
 
   Future<PostModel> createPost({
-    required String community,
+    String? community,
     required String title,
     required String type,
     String? body,
@@ -43,7 +43,7 @@ class PostRepository {
     final resp = await _client.post(
       '/posts',
       data: {
-        'community': community,
+        if (community != null && community.isNotEmpty) 'community': community,
         'title': title,
         'type': type,
         'body': body,
@@ -65,6 +65,47 @@ class PostRepository {
       'upvotes': resp.data['upvotes'] as int,
       'downvotes': resp.data['downvotes'] as int,
     };
+  }
+
+  Future<PostModel> updatePost({
+    required String id,
+    String? title,
+    String? body,
+    List<String>? tags,
+    bool? isSpoiler,
+    bool? isOc,
+  }) async {
+    final resp = await _client.put(
+      '/posts/$id',
+      data: {
+        if (title != null) 'title': title,
+        if (body != null) 'body': body,
+        if (tags != null) 'tags': tags,
+        if (isSpoiler != null) 'isSpoiler': isSpoiler,
+        if (isOc != null) 'isOc': isOc,
+      },
+    );
+    return PostModel.fromJson(resp.data['post']);
+  }
+
+  Future<void> deletePost(String id) async {
+    await _client.delete('/posts/$id');
+  }
+
+  Future<List<PostModel>> listUserPosts({
+    required String username,
+    String sort = 'hot',
+  }) async {
+    final resp = await _client.get(
+      '/posts/user/$username',
+      queryParameters: {
+        'sort': sort,
+      },
+    );
+    final list = resp.data['posts'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => PostModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 }
 

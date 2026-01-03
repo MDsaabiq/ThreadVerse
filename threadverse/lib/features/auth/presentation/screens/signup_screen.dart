@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:threadverse/core/constants/app_constants.dart';
 import 'package:threadverse/core/network/api_client.dart';
 import 'package:threadverse/core/repositories/auth_repository.dart';
+import 'package:threadverse/core/utils/error_handler.dart';
 
 /// Signup screen for user registration
 class SignupScreen extends StatefulWidget {
@@ -40,29 +41,38 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _handleSignup() async {
-    // Validate inputs
-    if (_usernameController.text.isEmpty ||
-        _emailController.text.isEmpty ||
-        _passwordController.text.isEmpty ||
-        _confirmPasswordController.text.isEmpty) {
-      _showSnackBar('Please fill in all fields');
-      return;
-    }
+    // Validate username
+    if (!ErrorHandler.validateInput(
+      context,
+      value: _usernameController.text.trim(),
+      fieldName: 'Username',
+      required: true,
+      minLength: 3,
+      maxLength: 20,
+      pattern: r'^[a-zA-Z0-9_-]+$',
+    )) return;
 
+    // Validate email
+    if (!ErrorHandler.validateInput(
+      context,
+      value: _emailController.text.trim(),
+      fieldName: 'Email',
+      required: true,
+      pattern: r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+    )) return;
+
+    // Validate password
+    if (!ErrorHandler.validateInput(
+      context,
+      value: _passwordController.text.trim(),
+      fieldName: 'Password',
+      required: true,
+      minLength: 6,
+    )) return;
+
+    // Check password match
     if (_passwordController.text != _confirmPasswordController.text) {
-      _showSnackBar('Passwords do not match');
-      return;
-    }
-
-    if (!AppConstants.usernameRegex.hasMatch(_usernameController.text)) {
-      _showSnackBar(
-        'Username must be 3-20 characters (letters, numbers, _, -)',
-      );
-      return;
-    }
-
-    if (!AppConstants.emailRegex.hasMatch(_emailController.text)) {
-      _showSnackBar('Invalid email address');
+      ErrorHandler.showWarning(context, 'Passwords do not match');
       return;
     }
 
@@ -77,10 +87,17 @@ class _SignupScreenState extends State<SignupScreen> {
       );
 
       if (mounted) {
+        ErrorHandler.showSuccess(
+          context,
+          'Account created successfully!',
+          title: 'Welcome to ThreadVerse',
+        );
         context.go(AppConstants.routeHome);
       }
     } catch (e) {
-      _showSnackBar('Signup failed');
+      if (mounted) {
+        ErrorHandler.handleError(context, e);
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -88,9 +105,23 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+  Widget _buildPasswordRequirement(String requirement, bool isMet) {
+    return Row(
+      children: [
+        Icon(
+          isMet ? Icons.check_circle : Icons.radio_button_unchecked,
+          size: 16,
+          color: isMet ? Colors.green : Colors.grey,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          requirement,
+          style: TextStyle(
+            fontSize: 12,
+            color: isMet ? Colors.green : Colors.grey,
+          ),
+        ),
+      ],
     );
   }
 
@@ -166,8 +197,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
-                    hintText: 'Password',
+                    hintText: 'Password (min. 6 characters)',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
                       icon: Icon(
@@ -181,6 +213,27 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                   enabled: !_isLoading,
+                ),
+                const SizedBox(height: 8),
+                // Password strength indicator
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildPasswordRequirement(
+                        'At least 6 characters',
+                        _passwordController.text.length >= 6,
+                      ),
+                      const SizedBox(height: 4),
+                      _buildPasswordRequirement(
+                        'Passwords match',
+                        _passwordController.text.isNotEmpty &&
+                            _passwordController.text ==
+                                _confirmPasswordController.text,
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
 

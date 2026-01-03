@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:threadverse/core/constants/app_constants.dart';
 import 'package:threadverse/core/network/api_client.dart';
 import 'package:threadverse/core/repositories/auth_repository.dart';
+import 'package:threadverse/core/utils/error_handler.dart';
 
 /// Login screen for user authentication
 class LoginScreen extends StatefulWidget {
@@ -34,10 +35,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleLogin() async {
     // Validate inputs
-    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showSnackBar('Please fill in all fields');
-      return;
-    }
+    if (!ErrorHandler.validateInput(
+      context,
+      value: _usernameController.text.trim(),
+      fieldName: 'Username',
+      required: true,
+      minLength: 3,
+    )) return;
+
+    if (!ErrorHandler.validateInput(
+      context,
+      value: _passwordController.text.trim(),
+      fieldName: 'Password',
+      required: true,
+      minLength: 6,
+    )) return;
 
     setState(() => _isLoading = true);
 
@@ -49,22 +61,18 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
-        // Navigate to home on success
+        ErrorHandler.showSuccess(context, 'Welcome back!');
         context.go(AppConstants.routeHome);
       }
     } catch (e) {
-      _showSnackBar('Login failed');
+      if (mounted) {
+        ErrorHandler.handleError(context, e);
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
-    );
   }
 
   @override

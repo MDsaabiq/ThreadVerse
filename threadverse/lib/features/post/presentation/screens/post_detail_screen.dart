@@ -5,12 +5,13 @@ import 'package:threadverse/core/models/post_model.dart';
 import 'package:threadverse/core/repositories/comment_repository.dart';
 import 'package:threadverse/core/repositories/post_repository.dart';
 import 'package:threadverse/core/widgets/comment_card.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 /// Post detail screen with comments
 class PostDetailScreen extends StatefulWidget {
   final String postId;
 
-  const PostDetailScreen({super.key, required this.postId});
+  const PostDetailScreen({required this.postId});
 
   @override
   State<PostDetailScreen> createState() => _PostDetailScreenState();
@@ -19,8 +20,9 @@ class PostDetailScreen extends StatefulWidget {
 class _PostDetailScreenState extends State<PostDetailScreen> {
   late TextEditingController _commentController;
   PostModel? _post;
-  List<CommentModel> _comments = const [];
-  bool _loading = true;
+  List<CommentModel> _comments = [];
+  Map<String, List<CommentModel>> _repliesByParent = {};
+  bool _loading = false;
   bool _isUpvoted = false;
   bool _isDownvoted = false;
 
@@ -42,9 +44,19 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     try {
       final post = await postRepository.getPost(widget.postId);
       final comments = await commentRepository.listForPost(widget.postId);
+      final replies = <String, List<CommentModel>>{};
+
+      for (final comment in comments) {
+        final parentId = comment.parentCommentId;
+        if (parentId != null) {
+          replies.putIfAbsent(parentId, () => []).add(comment);
+        }
+      }
+
       setState(() {
         _post = post;
         _comments = comments;
+        _repliesByParent = replies;
       });
     } catch (_) {
       if (mounted) {
@@ -57,8 +69,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  Widget _buildComment(CommentModel comment, {int depth = 0}) {
-    // For now, show flat list; nested replies would need grouping by parentId.
+  List<CommentModel> get _rootComments =>
+      _comments.where((c) => c.parentCommentId == null).toList();
+
+  Widget _buildCommentThread(CommentModel comment, {int depth = 0}) {
+    final children = _repliesByParent[comment.id] ?? [];
+
     return CommentCard(
       username: comment.authorUsername,
       content: comment.content,
@@ -66,6 +82,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       upvotes: comment.upvotes,
       downvotes: comment.downvotes,
       depth: depth,
+      replyCount: children.length,
+      replies: children
+          .map((child) => _buildCommentThread(child, depth: depth + 1))
+          .toList(),
       onUpvote: () async {
         await commentRepository.vote(comment.id, 1);
         _load();
@@ -81,12 +101,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 
   void _showReplyDialog(String parentCommentId) {
+    final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reply'),
         content: TextField(
-          controller: _commentController,
+          controller: controller,
           maxLines: 3,
           decoration: const InputDecoration(
             hintText: 'Write your reply...',
@@ -99,23 +120,21 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
-              () async {
-                try {
-                  await commentRepository.create(
-                    postId: widget.postId,
-                    parentId: parentCommentId,
-                    content: _commentController.text.trim(),
-                  );
-                  _commentController.clear();
-                  if (mounted) Navigator.pop(context);
-                  _load();
-                } catch (_) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to reply')),
-                  );
-                }
-              }();
+            onPressed: () async {
+              try {
+                await commentRepository.create(
+                  postId: widget.postId,
+                  parentId: parentCommentId,
+                  content: controller.text.trim(),
+                );
+                controller.clear();
+                if (mounted) Navigator.pop(context);
+                _load();
+              } catch (_) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to reply')),
+                );
+              }
             },
             child: const Text('Reply'),
           ),
@@ -215,8 +234,57 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       const SizedBox(height: 16),
 
                       // Content
-                      if (post.body != null && post.body!.isNotEmpty)
-                        Text(post.body!, style: theme.textTheme.bodyMedium),
+                      if (post.body != null && post.body!.isNotEmpty) ...[
+                        MarkdownBody(
+                          data: post.body!,
+                          styleSheet: MarkdownStyleSheet(
+                            p: theme.textTheme.bodyMedium,
+                            h1: theme.textTheme.headlineMedium,
+                            h2: theme.textTheme.headlineSmall,
+                            h3: theme.textTheme.titleLarge,
+                            a: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.primaryColor,
+                              decoration: TextDecoration.underline,
+                            ),
+                            code: theme.textTheme.bodySmall?.copyWith(
+                              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                              fontFamily: 'monospace',
+                            ),
+                            blockquote: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                          shrinkWrap: true,
+                          onTapLink: (text, href, title) {
+                            if (href != null) {
+                              // Handle link navigation
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Image display
+                      if (post.imageUrl != null && post.imageUrl!.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            post.imageUrl!,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                              height: 250,
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              child: const Center(
+                                child: Icon(Icons.broken_image),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
 
                       // Vote buttons
@@ -316,7 +384,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 ),
 
                 // Comments list
-                ..._comments.map((comment) => _buildComment(comment)),
+                ..._rootComments.map(
+                  (comment) => _buildCommentThread(comment),
+                ),
 
                 const SizedBox(height: 80), // Space for comment input
               ],

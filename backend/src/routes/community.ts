@@ -5,15 +5,25 @@ import {
   joinCommunity,
   leaveCommunity,
   listCommunities,
-} from "../controllers/communityController.ts";
-import { requireAuth } from "../middleware/auth.ts";
+  getJoinRequests,
+  handleJoinRequest,
+  getMembers,
+  getUserCommunities,
+  checkMembership,
+} from "../controllers/communityController.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 
 const router = Router();
 
-router.get("/", listCommunities);
+router.get("/", optionalAuth, listCommunities);
 router.post("/", requireAuth, createCommunity);
+router.get("/my-communities", requireAuth, getUserCommunities);
 router.get("/:name", getCommunity);
+router.get("/:name/members", getMembers);
+router.get("/:name/membership", requireAuth, checkMembership);
 router.post("/:name/join", requireAuth, joinCommunity);
 router.delete("/:name/join", requireAuth, leaveCommunity);
+router.get("/:name/join-requests", requireAuth, getJoinRequests);
+router.post("/:name/join-requests/:requestId", requireAuth, handleJoinRequest);
 
 export default router;

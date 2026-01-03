@@ -1,11 +1,11 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { asyncHandler } from "../utils/asyncHandler.ts";
-import { badRequest, unauthorized } from "../utils/errors.ts";
-import { hashPassword, verifyPassword } from "../utils/password.ts";
-import { signAccessToken } from "../utils/jwt.ts";
-import { User } from "../models/User.ts";
-import type { AuthenticatedRequest } from "../middleware/auth.ts";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { badRequest, unauthorized } from "../utils/errors.js";
+import { hashPassword, verifyPassword } from "../utils/password.js";
+import { signAccessToken } from "../utils/jwt.js";
+import { User } from "../models/User.js";
+import type { AuthenticatedRequest } from "../middleware/auth.js";
 
 const signupSchema = z.object({
   username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_-]+$/),
@@ -48,7 +48,7 @@ export const signup = asyncHandler(async (req: Request, res: Response) => {
     displayName: body.username,
   });
 
-  const token = signAccessToken({ id: user._id.toString(), username: user.username });
+  const token = signAccessToken({ id: user._id.toString(), username: user.username as string });
 
   res.status(201).json({ user: toPublicUser(user), accessToken: token });
 });
@@ -61,10 +61,10 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   });
   if (!user) throw unauthorized("Invalid credentials");
 
-  const ok = await verifyPassword(body.password, user.passwordHash);
+  const ok = await verifyPassword(body.password, user.passwordHash as string);
   if (!ok) throw unauthorized("Invalid credentials");
 
-  const token = signAccessToken({ id: user._id.toString(), username: user.username });
+  const token = signAccessToken({ id: user._id.toString(), username: user.username as string });
   res.json({ user: toPublicUser(user), accessToken: token });
 });
 

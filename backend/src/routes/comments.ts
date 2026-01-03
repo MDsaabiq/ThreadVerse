@@ -3,8 +3,8 @@ import {
   createComment,
   listComments,
   voteComment,
-} from "../controllers/commentController.ts";
-import { requireAuth } from "../middleware/auth.ts";
+} from "../controllers/commentController.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 

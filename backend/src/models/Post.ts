@@ -11,7 +11,7 @@ const pollOptionSchema = new Schema(
 
 const postSchema = new Schema(
   {
-    communityId: { type: Types.ObjectId, ref: "Community", required: true, index: true },
+    communityId: { type: Types.ObjectId, ref: "Community", index: true },
     authorId: { type: Types.ObjectId, ref: "User", required: true, index: true },
     type: { type: String, enum: ["text", "link", "image", "poll"], required: true },
     title: { type: String, required: true },

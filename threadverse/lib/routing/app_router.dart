@@ -8,8 +8,11 @@ import 'package:threadverse/features/home/presentation/screens/home_screen.dart'
 import 'package:threadverse/features/post/presentation/screens/create_post_screen.dart';
 import 'package:threadverse/features/post/presentation/screens/post_detail_screen.dart';
 import 'package:threadverse/features/community/presentation/screens/community_screen.dart';
+import 'package:threadverse/features/community/presentation/screens/communities_list_screen.dart';
 import 'package:threadverse/features/community/presentation/screens/create_community_screen.dart';
+import 'package:threadverse/features/community/presentation/screens/join_requests_screen.dart';
 import 'package:threadverse/features/profile/presentation/screens/profile_screen.dart';
+import 'package:threadverse/features/profile/presentation/screens/user_preview_screen.dart';
 import 'package:threadverse/features/settings/presentation/screens/settings_screen.dart';
 
 /// App routing configuration using GoRouter
@@ -85,13 +88,32 @@ class AppRouter {
 
       // Community Routes
       GoRoute(
-        path: '${AppConstants.routeCommunity}/:communityId',
+        path: '/communities',
+        name: 'communities-list',
+        pageBuilder: (context, state) => MaterialPage(
+          key: state.pageKey,
+          child: const CommunitiesListScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '${AppConstants.routeCommunity}/:communityName',
         name: 'community',
         pageBuilder: (context, state) {
-          final communityId = state.pathParameters['communityId']!;
+          final communityName = state.pathParameters['communityName']!;
           return MaterialPage(
             key: state.pageKey,
-            child: CommunityScreen(communityId: communityId),
+            child: CommunityScreen(communityName: communityName),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/community/:communityName/join-requests',
+        name: 'join-requests',
+        pageBuilder: (context, state) {
+          final communityName = state.pathParameters['communityName']!;
+          return MaterialPage(
+            key: state.pageKey,
+            child: JoinRequestsScreen(communityName: communityName),
           );
         },
       ),
@@ -105,6 +127,17 @@ class AppRouter {
           return MaterialPage(
             key: state.pageKey,
             child: ProfileScreen(username: username),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/user-preview/:username',
+        name: 'user-preview',
+        pageBuilder: (context, state) {
+          final username = state.pathParameters['username']!;
+          return MaterialPage(
+            key: state.pageKey,
+            child: UserPreviewScreen(username: username),
           );
         },
       ),

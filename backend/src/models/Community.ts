@@ -14,6 +14,8 @@ const communitySchema = new Schema(
     memberCount: { type: Number, default: 1 },
     moderators: [{ type: Types.ObjectId, ref: "User" }],
     rules: [{ type: String }],
+    iconUrl: { type: String },
+    bannerUrl: { type: String },
   },
   { timestamps: true }
 );

@@ -25,6 +25,8 @@ class CommunityRepository {
     required bool isPrivate,
     required bool isNsfw,
     required List<String> allowedPostTypes,
+    String? iconUrl,
+    String? bannerUrl,
   }) async {
     final resp = await _client.post(
       '/communities',
@@ -34,6 +36,8 @@ class CommunityRepository {
         'isPrivate': isPrivate,
         'isNsfw': isNsfw,
         'allowedPostTypes': allowedPostTypes,
+        if (iconUrl != null) 'iconUrl': iconUrl,
+        if (bannerUrl != null) 'bannerUrl': bannerUrl,
       },
     );
     return CommunityModel.fromJson(resp.data['community']);
@@ -45,6 +49,35 @@ class CommunityRepository {
 
   Future<void> leave(String name) async {
     await _client.delete('/communities/$name/join');
+  }
+
+  Future<Map<String, dynamic>> checkMembership(String name) async {
+    final resp = await _client.get('/communities/$name/membership');
+    return resp.data as Map<String, dynamic>;
+  }
+
+  Future<List<CommunityModel>> getUserCommunities() async {
+    final resp = await _client.get('/communities/my-communities');
+    final list = resp.data['communities'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => CommunityModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<dynamic>> getJoinRequests(String communityName) async {
+    final resp = await _client.get('/communities/$communityName/join-requests');
+    return resp.data['requests'] as List<dynamic>? ?? [];
+  }
+
+  Future<void> handleJoinRequest(
+    String communityName,
+    String requestId,
+    String action,
+  ) async {
+    await _client.post(
+      '/communities/$communityName/join-requests/$requestId',
+      data: {'action': action},
+    );
   }
 }
 

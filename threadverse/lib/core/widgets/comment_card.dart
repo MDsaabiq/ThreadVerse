@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 /// Reusable comment card widget for displaying comments
 class CommentCard extends StatelessWidget {
   final String username;
+  final String? avatarUrl;
   final String content;
+  final String? imageUrl;
   final DateTime timestamp;
   final int upvotes;
   final int downvotes;
@@ -20,7 +23,9 @@ class CommentCard extends StatelessWidget {
   const CommentCard({
     super.key,
     required this.username,
+    this.avatarUrl,
     required this.content,
+    this.imageUrl,
     required this.timestamp,
     this.upvotes = 0,
     this.downvotes = 0,
@@ -38,6 +43,7 @@ class CommentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final netVotes = upvotes - downvotes;
+    final initial = username.isNotEmpty ? username[0].toUpperCase() : '?';
 
     return Container(
       margin: EdgeInsets.only(left: depth * 16.0, bottom: 8.0),
@@ -61,23 +67,35 @@ class CommentCard extends StatelessWidget {
               // Header
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 12,
-                    backgroundColor: theme.primaryColor,
-                    child: Text(
-                      username[0].toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  GestureDetector(
+                    onTap: () => context.push('/user-preview/$username'),
+                    child: CircleAvatar(
+                      radius: 12,
+                      backgroundColor: theme.primaryColor,
+                      backgroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
+                          ? NetworkImage(avatarUrl!)
+                          : null,
+                      child: (avatarUrl == null || avatarUrl!.isEmpty)
+                          ? Text(
+                              username.isNotEmpty ? username[0].toUpperCase() : '?',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    'u/$username',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  GestureDetector(
+                    onTap: () => context.push('/user-preview/$username'),
+                    child: Text(
+                      'u/$username',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.primaryColor,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -93,6 +111,27 @@ class CommentCard extends StatelessWidget {
 
               // Content
               Text(content, style: theme.textTheme.bodyMedium),
+              
+              // Image preview if exists
+              if (imageUrl != null && imageUrl!.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    imageUrl!,
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 150,
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      child: const Center(
+                        child: Icon(Icons.broken_image),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
 
               // Actions

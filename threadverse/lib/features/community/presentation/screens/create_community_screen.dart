@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:threadverse/core/constants/app_constants.dart';
 import 'package:threadverse/core/repositories/community_repository.dart';
+import 'package:threadverse/core/repositories/upload_repository.dart';
 
 /// Create community screen with detailed options
 class CreateCommunityScreen extends StatefulWidget {
@@ -20,12 +22,90 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
   bool _allowLink = true;
   bool _allowImage = true;
   bool _allowPoll = true;
+  String? _iconUrl;
+  String? _bannerUrl;
+  bool _uploadingIcon = false;
+  bool _uploadingBanner = false;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
     _descriptionController = TextEditingController();
+  }
+
+  Future<void> _pickAndUploadIcon() async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        setState(() => _uploadingIcon = true);
+        try {
+          final iconUrl = await uploadRepository.uploadPostImage(pickedFile);
+          setState(() => _iconUrl = iconUrl);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Icon uploaded successfully')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error uploading icon: $e')),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _uploadingIcon = false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadBanner() async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        setState(() => _uploadingBanner = true);
+        try {
+          final bannerUrl = await uploadRepository.uploadPostImage(pickedFile);
+          setState(() => _bannerUrl = bannerUrl);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Banner uploaded successfully')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error uploading banner: $e')),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => _uploadingBanner = false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -72,6 +152,8 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
             if (_allowImage) AppConstants.postTypeImage,
             if (_allowPoll) AppConstants.postTypePoll,
           ],
+          iconUrl: _iconUrl,
+          bannerUrl: _bannerUrl,
         );
 
         if (mounted) {
@@ -132,6 +214,157 @@ class _CreateCommunityScreenState extends State<CreateCommunityScreen> {
                 helperText: 'What is this community about?',
               ),
               onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 20),
+
+            Text(
+              'Community Icon & Banner',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Community Icon', style: theme.textTheme.bodyMedium),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: theme.dividerColor),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: _iconUrl != null
+                            ? Stack(
+                                alignment: Alignment.topRight,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      _iconUrl!,
+                                      height: 100,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                      onPressed: () =>
+                                          setState(() => _iconUrl = null),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : SizedBox(
+                                height: 100,
+                                width: double.infinity,
+                                child: Center(
+                                  child: _uploadingIcon
+                                      ? const SizedBox(
+                                          height: 30,
+                                          width: 30,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : OutlinedButton.icon(
+                                          onPressed: _pickAndUploadIcon,
+                                          icon: const Icon(Icons.image),
+                                          label:
+                                              const Text('Upload Icon'),
+                                        ),
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Banner Image',
+                          style: theme.textTheme.bodyMedium),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: theme.dividerColor),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: _bannerUrl != null
+                            ? Stack(
+                                alignment: Alignment.topRight,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      _bannerUrl!,
+                                      height: 100,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                      onPressed: () =>
+                                          setState(() => _bannerUrl = null),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : SizedBox(
+                                height: 100,
+                                width: double.infinity,
+                                child: Center(
+                                  child: _uploadingBanner
+                                      ? const SizedBox(
+                                          height: 30,
+                                          width: 30,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : OutlinedButton.icon(
+                                          onPressed:
+                                              _pickAndUploadBanner,
+                                          icon: const Icon(Icons.image),
+                                          label: const Text('Upload Banner'),
+                                        ),
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
 

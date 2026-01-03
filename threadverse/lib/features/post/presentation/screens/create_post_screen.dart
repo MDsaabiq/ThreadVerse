@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:threadverse/core/constants/app_constants.dart';
 import 'package:threadverse/core/models/community_model.dart';
 import 'package:threadverse/core/repositories/community_repository.dart';
 import 'package:threadverse/core/repositories/post_repository.dart';
+import 'package:threadverse/core/repositories/upload_repository.dart';
+import 'package:threadverse/core/widgets/image_picker_widget.dart';
+import 'package:threadverse/core/utils/error_handler.dart';
 
 /// Create post screen with detailed options and validation
 class CreatePostScreen extends StatefulWidget {
@@ -27,6 +31,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final List<String> _tags = [];
   List<CommunityModel> _communities = const [];
   bool _loadingCommunities = true;
+  String? _uploadedImageUrl;
+  bool _uploadingImage = false;
 
   @override
   void initState() {
@@ -47,10 +53,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         _selectedCommunity =
             widget.communityId ?? (list.isNotEmpty ? list.first.name : null);
       });
-    } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to load communities')),
-      );
+    } catch (e) {
+      if (mounted) {
+        ErrorHandler.handleError(context, e);
+      }
     } finally {
       if (mounted) setState(() => _loadingCommunities = false);
     }
@@ -83,32 +89,33 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   void _handleSubmit() {
-    if (_selectedCommunity == null || _selectedCommunity!.isEmpty) {
-      ScaffoldMessenger.of(
+    // Validate title
+    if (!ErrorHandler.validateInput(
+      context,
+      value: _titleController.text.trim(),
+      fieldName: 'Title',
+      required: true,
+      minLength: 1,
+      maxLength: 300,
+    )) return;
+
+    // Validate based on post type
+    if (_postType == 'text') {
+      if (!ErrorHandler.validateInput(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Select a community')));
-      return;
+        value: _contentController.text.trim(),
+        fieldName: 'Content',
+        required: true,
+      )) return;
     }
 
-    if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
+    if (_postType == 'link') {
+      if (!ErrorHandler.validateInput(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Title is required')));
-      return;
-    }
-
-    if (_postType == 'text' && _contentController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Add some content')));
-      return;
-    }
-
-    if (_postType == 'link' && _linkController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Link is required')));
-      return;
+        value: _linkController.text.trim(),
+        fieldName: 'Link',
+        required: true,
+      )) return;
     }
 
     if (_postType == 'poll') {
@@ -117,8 +124,27 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           .where((t) => t.isNotEmpty)
           .toList();
       if (filled.length < 2) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Poll needs at least 2 options')),
+        ErrorHandler.showWarning(
+          context,
+          'Poll needs at least 2 options',
+        );
+        return;
+      }
+    }
+
+    if (_postType == 'image') {
+      if (_uploadingImage) {
+        ErrorHandler.showWarning(
+          context,
+          'Please wait for the image to finish uploading',
+        );
+        return;
+      }
+
+      if (_uploadedImageUrl == null || _uploadedImageUrl!.isEmpty) {
+        ErrorHandler.showWarning(
+          context,
+          'Please select and upload an image first',
         );
         return;
       }
@@ -127,12 +153,12 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     () async {
       try {
         await postRepository.createPost(
-          community: _selectedCommunity!,
+          community: _selectedCommunity,
           title: _titleController.text.trim(),
           type: _postType,
           body: _postType == 'text' ? _contentController.text.trim() : null,
           linkUrl: _postType == 'link' ? _linkController.text.trim() : null,
-          imageUrl: _postType == 'image' ? _linkController.text.trim() : null,
+          imageUrl: _postType == 'image' ? _uploadedImageUrl : null,
           tags: _tags,
           isSpoiler: _isSpoiler,
           isOc: _isOc,
@@ -144,15 +170,20 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               : null,
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Posted to r/$_selectedCommunity')),
-          );
+          if (_selectedCommunity != null && _selectedCommunity!.isNotEmpty) {
+            ErrorHandler.showSuccess(
+              context,
+              'Posted to r/$_selectedCommunity',
+            );
+          } else {
+            ErrorHandler.showSuccess(context, 'Posted successfully');
+          }
           context.pop();
         }
-      } catch (_) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Failed to post')));
+      } catch (e) {
+        if (mounted) {
+          ErrorHandler.handleError(context, e);
+        }
       }
     }();
   }
@@ -185,17 +216,42 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             const SizedBox(height: 8),
             _loadingCommunities
                 ? const Center(child: CircularProgressIndicator())
-                : Wrap(
-                    spacing: 8,
-                    children: _communities.map((c) {
-                      final id = c.name;
-                      return ChoiceChip(
-                        label: Text('r/$id'),
-                        selected: _selectedCommunity == id,
-                        onSelected: (_) =>
-                            setState(() => _selectedCommunity = id),
-                      );
-                    }).toList(),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('📢 Public Feed'),
+                            selected: _selectedCommunity == null ||
+                                _selectedCommunity!.isEmpty,
+                            onSelected: (_) =>
+                                setState(() => _selectedCommunity = null),
+                          ),
+                          ..._communities.map((c) {
+                            final id = c.name;
+                            return ChoiceChip(
+                              label: Text('r/$id'),
+                              selected: _selectedCommunity == id,
+                              onSelected: (_) =>
+                                  setState(() => _selectedCommunity = id),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                      if (_selectedCommunity == null ||
+                          _selectedCommunity!.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Post will be shared to the public feed',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.hintColor,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
 
             const SizedBox(height: 16),
@@ -262,22 +318,30 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               ),
 
             if (_postType == 'image')
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: theme.dividerColor),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.image_outlined),
-                    const SizedBox(width: 12),
-                    const Text('Mock image picker placeholder'),
-                    const Spacer(),
-                    TextButton(onPressed: () {}, child: const Text('Attach')),
-                  ],
-                ),
+              ImagePickerWidget(
+                label: 'Select Image for Post',
+                onImageSelected: (file) async {
+                  setState(() {
+                    _uploadingImage = true;
+                  });
+                  try {
+                    final imageUrl = await uploadRepository.uploadPostImage(file);
+                    setState(() {
+                      _uploadedImageUrl = imageUrl;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Image uploaded successfully')),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error uploading image: $e')),
+                    );
+                  } finally {
+                    if (mounted) {
+                      setState(() => _uploadingImage = false);
+                    }
+                  }
+                },
               ),
 
             if (_postType == 'poll') ...[

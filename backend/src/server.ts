@@ -1,13 +1,15 @@
-import cors from "cors";
 import dotenv from "dotenv";
+
+// Load environment variables FIRST, before importing config modules
+dotenv.config();
+
+import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
-import { connectToDatabase } from "./config/db.ts";
-import { errorHandler } from "./middleware/errorHandler.ts";
-import apiRouter from "./routes/index.ts";
-
-dotenv.config();
+import { connectToDatabase } from "./config/db.js";
+import { errorHandler } from "./middleware/errorHandler.js";
+import apiRouter from "./routes/index.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const app = express();

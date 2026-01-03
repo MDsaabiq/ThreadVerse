@@ -84,19 +84,6 @@ class CommunityHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-
-                // Join Button
-                ElevatedButton(
-                  onPressed: onJoinToggle,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isJoined ? Colors.white : Colors.white,
-                    foregroundColor: isJoined
-                        ? theme.primaryColor
-                        : theme.primaryColor,
-                    elevation: 0,
-                  ),
-                  child: Text(isJoined ? 'Joined' : 'Join'),
-                ),
               ],
             ),
           ),

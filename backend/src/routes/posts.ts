@@ -4,14 +4,20 @@ import {
   getPost,
   listPosts,
   votePost,
-} from "../controllers/postController.ts";
-import { requireAuth } from "../middleware/auth.ts";
+  updatePost,
+  deletePost,
+  listUserPosts,
+} from "../controllers/postController.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
 router.get("/", listPosts);
 router.post("/", requireAuth, createPost);
+router.get("/user/:username", listUserPosts);
 router.get("/:id", getPost);
+router.put("/:id", requireAuth, updatePost);
+router.delete("/:id", requireAuth, deletePost);
 router.post("/:id/vote", requireAuth, votePost);
 
 export default router;

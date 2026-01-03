@@ -6,6 +6,8 @@ class CommunityModel {
   final bool isNsfw;
   final List<String> allowedPostTypes;
   final int memberCount;
+  final String? iconUrl;
+  final String? bannerUrl;
 
   CommunityModel({
     required this.id,
@@ -15,6 +17,8 @@ class CommunityModel {
     required this.isNsfw,
     required this.allowedPostTypes,
     required this.memberCount,
+    this.iconUrl,
+    this.bannerUrl,
   });
 
   factory CommunityModel.fromJson(Map<String, dynamic> json) {
@@ -28,6 +32,8 @@ class CommunityModel {
           .map((e) => e.toString())
           .toList(),
       memberCount: (json['memberCount'] ?? 0) as int,
+      iconUrl: json['iconUrl'] as String?,
+      bannerUrl: json['bannerUrl'] as String?,
     );
   }
 }

@@ -1,21 +1,37 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { asyncHandler } from "../utils/asyncHandler.ts";
-import { badRequest, notFound } from "../utils/errors.ts";
-import { Comment } from "../models/Comment.ts";
-import { Post } from "../models/Post.ts";
-import type { AuthenticatedRequest } from "../middleware/auth.ts";
-import { Vote } from "../models/Vote.ts";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { badRequest, notFound } from "../utils/errors.js";
+import { Comment } from "../models/Comment.js";
+import { Post } from "../models/Post.js";
+import type { AuthenticatedRequest } from "../middleware/auth.js";
+import { Vote } from "../models/Vote.js";
+import { updateUserKarma, updateCommunityReputation, incrementCommunityContentCount } from "../utils/karma.js";
 
 const createCommentSchema = z.object({
   content: z.string().min(1).max(10000),
-  parentCommentId: z.string().optional(),
+  parentCommentId: z.string().nullable().optional(),
 });
 
 export const listComments = asyncHandler(async (req: Request, res: Response) => {
   const { postId } = req.params;
-  const comments = await Comment.find({ postId }).sort({ createdAt: 1 }).lean();
-  res.json({ comments });
+  const comments = await Comment.find({ postId })
+    .sort({ voteScore: -1, createdAt: 1 })
+    .populate("authorId", "username")
+    .lean();
+
+  const formatted = comments.map((comment: any) => ({
+    ...comment,
+    author:
+      comment.authorId && typeof comment.authorId === "object"
+        ? {
+            id: comment.authorId._id?.toString?.(),
+            username: comment.authorId.username,
+          }
+        : undefined,
+  }));
+
+  res.json({ comments: formatted });
 });
 
 export const createComment = asyncHandler(
@@ -31,6 +47,31 @@ export const createComment = asyncHandler(
       const parent = await Comment.findById(body.parentCommentId);
       if (!parent) throw badRequest("Parent comment not found");
       depth = (parent.depth ?? 0) + 1;
+
+      // Prevent duplicate comments: Check if user already commented on this parent in last 30 seconds
+      const recentDuplicate = await Comment.findOne({
+        parentCommentId: body.parentCommentId,
+        authorId: req.user!.id,
+        content: body.content,
+        createdAt: { $gte: new Date(Date.now() - 30000) }, // Last 30 seconds
+      });
+
+      if (recentDuplicate) {
+        throw badRequest("You've already posted this comment. Please wait before commenting again.");
+      }
+    } else {
+      // Check for duplicate top-level comments on the post
+      const recentDuplicate = await Comment.findOne({
+        postId,
+        parentCommentId: null,
+        authorId: req.user!.id,
+        content: body.content,
+        createdAt: { $gte: new Date(Date.now() - 30000) },
+      });
+
+      if (recentDuplicate) {
+        throw badRequest("You've already posted this comment. Please wait before commenting again.");
+      }
     }
 
     const comment = await Comment.create({
@@ -41,10 +82,25 @@ export const createComment = asyncHandler(
       depth,
     });
 
+    const populated = await comment.populate("authorId", "username");
+
     post.commentCount += 1;
     await post.save();
 
-    res.status(201).json({ comment });
+    // Track content creation in community reputation
+    if (post.communityId) {
+      await incrementCommunityContentCount(req.user!.id, post.communityId, "comment");
+    }
+
+    res.status(201).json({
+      comment: {
+        ...populated.toObject(),
+        author: {
+          id: req.user!.id,
+          username: (populated as any).authorId?.username,
+        },
+      },
+    });
   }
 );
 
@@ -56,6 +112,11 @@ export const voteComment = asyncHandler(
 
     const comment = await Comment.findById(id);
     if (!comment) throw notFound("Comment not found");
+
+    // Prevent voting on own comment
+    if (comment.authorId.toString() === req.user!.id) {
+      throw badRequest("You cannot vote on your own comment");
+    }
 
     const existing = await Vote.findOne({
       userId: req.user!.id,
@@ -95,6 +156,15 @@ export const voteComment = asyncHandler(
 
     comment.voteScore += delta;
     await comment.save();
+
+    // Update author's karma
+    await updateUserKarma(comment.authorId, delta, "comment");
+    
+    // Get post to find community for reputation update
+    const post = await Post.findById(comment.postId, "communityId");
+    if (post?.communityId) {
+      await updateCommunityReputation(comment.authorId, post.communityId, delta, "comment");
+    }
 
     res.json({ voteScore: comment.voteScore, upvotes: comment.upvoteCount, downvotes: comment.downvoteCount });
   }
