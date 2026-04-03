@@ -5,6 +5,7 @@ import {
   listPosts,
   autoFillPost,
   votePost,
+  votePollOption,
   updatePost,
   deletePost,
   listUserPosts,
@@ -21,5 +22,6 @@ router.get("/:id", getPost);
 router.put("/:id", requireAuth, updatePost);
 router.delete("/:id", requireAuth, deletePost);
 router.post("/:id/vote", requireAuth, votePost);
+router.post("/:id/poll/:optionId/vote", requireAuth, votePollOption);
 
 export default router;

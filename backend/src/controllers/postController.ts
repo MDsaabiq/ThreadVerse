@@ -354,6 +354,35 @@ export const votePost = asyncHandler(
   }
 );
 
+export const votePollOption = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { id, optionId } = req.params;
+    if (!optionId) throw badRequest("Poll option is required");
+
+    const post = await Post.findById(id);
+    if (!post) throw notFound("Post not found");
+    if (post.type !== "poll" || !post.poll?.options?.length) {
+      throw badRequest("This post does not have a poll");
+    }
+
+    const option = post.poll.options.find((opt) => opt.id === optionId);
+    if (!option) throw notFound("Poll option not found");
+
+    option.votes += 1;
+    await post.save();
+
+    res.json({
+      poll: {
+        options: post.poll.options.map((opt) => ({
+          id: opt.id,
+          text: opt.text,
+          votes: opt.votes,
+        })),
+      },
+    });
+  }
+);
+
 const updatePostSchema = z.object({
   title: z.string().min(1).max(300).optional(),
   body: z.string().nullable().optional(),
