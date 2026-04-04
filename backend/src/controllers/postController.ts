@@ -9,6 +9,7 @@ import { Membership } from "../models/Membership.js";
 import { User } from "../models/User.js";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { Vote } from "../models/Vote.js";
+import { PollVote } from "../models/PollVote.js";
 import { updateUserKarma, updateCommunityReputation, incrementCommunityContentCount } from "../utils/karma.js";
 import { calculateAndUpdateTrustLevel } from "../utils/trustLevel.js";
 import { generatePostDraftWithGroq } from "../utils/groq.js";
@@ -368,6 +369,40 @@ export const votePollOption = asyncHandler(
     const option = post.poll.options.find((opt) => opt.id === optionId);
     if (!option) throw notFound("Poll option not found");
 
+    const existingVote = await PollVote.findOne({
+      userId: req.user!.id,
+      postId: id,
+    });
+
+    if (existingVote?.optionId === optionId) {
+      res.json({
+        poll: {
+          options: post.poll.options.map((opt) => ({
+            id: opt.id,
+            text: opt.text,
+            votes: opt.votes,
+          })),
+          selectedOptionId: optionId,
+        },
+      });
+      return;
+    }
+
+    if (existingVote) {
+      const previousOption = post.poll.options.find((opt) => opt.id === existingVote.optionId);
+      if (previousOption && previousOption.votes > 0) {
+        previousOption.votes -= 1;
+      }
+      existingVote.optionId = optionId;
+      await existingVote.save();
+    } else {
+      await PollVote.create({
+        userId: req.user!.id,
+        postId: id,
+        optionId,
+      });
+    }
+
     option.votes += 1;
     await post.save();
 
@@ -378,6 +413,7 @@ export const votePollOption = asyncHandler(
           text: opt.text,
           votes: opt.votes,
         })),
+        selectedOptionId: optionId,
       },
     });
   }
